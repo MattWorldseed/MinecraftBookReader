@@ -25,11 +25,13 @@ import java.awt.*;
 public class Main {
 
 	static ArrayList<Integer> bookHashes = new ArrayList<Integer>();
+	static ArrayList<String> signHashes = new ArrayList<String>();
 	
 	public static void main(String[] args) throws IOException
 	{
 		readBooksAnvil();
-		readPlayerData();
+		//readPlayerData();
+		//readSignsAnvil();
 		
 		/**
 		 * GUI TO-DO
@@ -83,6 +85,114 @@ public class Main {
 		frame.add(btn);
 		frame.add(btn2);
 		frame.add(test);
+	}
+	
+	public static void readSignsAnvil() throws IOException
+	{
+		File folder = new File("region");
+	    File[] listOfFiles = folder.listFiles();
+	    File output = new File("output.txt");
+	    BufferedWriter writer = new BufferedWriter(new FileWriter(output));
+	    
+		for (int f = 0; f < listOfFiles.length; f++)
+		{
+			writer.newLine();
+			writer.write("--------------------------------" + listOfFiles[f].getName() + "--------------------------------");
+		    writer.newLine();
+		    writer.newLine();
+			for (int x = 0; x < 32; x++)
+			{
+				for (int z = 0; z < 32; z++)
+				{
+					DataInputStream dataInputStream = MCR.RegionFileCache.getChunkInputStream(listOfFiles[f], x, z);
+					
+					if (dataInputStream == null) 
+						continue;
+					
+					Anvil. NBTTagCompound nbttagcompund = new Anvil.NBTTagCompound();
+				    nbttagcompund = Anvil.CompressedStreamTools.read(dataInputStream);
+				   
+				    Anvil.NBTTagCompound nbttagcompund2 = new Anvil.NBTTagCompound();
+				    nbttagcompund2 = nbttagcompund.getCompoundTag("Level");
+				    
+				    Anvil.NBTTagList tileEntities = nbttagcompund2.getTagList("TileEntities", 10);
+					
+				    for (int i = 0; i < tileEntities.tagCount(); i ++)
+				    {
+				    	Anvil.NBTTagCompound entity = tileEntities.getCompoundTagAt(i);
+				    	
+				    	//If Sign
+				    	if (!entity.hasKey("Text1"))
+				    		continue;
+		            
+			    		String text1 = entity.getString("Text1");
+		                String text2 = entity.getString("Text2");
+		                String text3 = entity.getString("Text3");
+		                String text4 = entity.getString("Text4");
+		                			                
+		                JSONObject json1 = null;
+		                JSONObject json2 = null;
+		                JSONObject json3 = null;
+		                JSONObject json4 = null;
+		                
+		                String[] signLines = { text1, text2, text3, text4 };
+		                
+		                String hash = text1 + text2 + text3 + text4;
+		                if (signHashes.contains(hash))
+		                	continue;
+		                else
+		                	signHashes.add(hash);
+		                
+		                JSONObject[] objects = { json1, json2, json3, json4 };
+		                
+		                writer.write("Chunk [" + x + ", " + z + "]\t(" + entity.getInteger("x") + " " + entity.getInteger("y") + " " + entity.getInteger("z") + ")\t\t");
+		                
+		                for (int j = 0; j < 4; j++)
+		                {
+		                	if (signLines[j].startsWith("{"))
+		                	{
+		                		try
+		                		{
+		                			objects[j] = new JSONObject(signLines[j]);
+		                		}
+		                		catch (JSONException e)
+		                		{
+		                			objects[j] = null;
+		                		}
+		                	}
+		                }
+		               
+		                for (int o = 0; o < 4; o++)
+		                {
+		                	if (objects[o] != null)
+		                	{
+			                    if (objects[o].has("extra"))
+			                    {
+			                    	for (int h = 0; h < objects[o].getJSONArray("extra").length(); h++)
+			                    	{
+				                        if ((objects[o].getJSONArray("extra").get(0) instanceof String)) 
+				                        	writer.write(objects[o].getJSONArray("extra").get(0).toString());
+				                        else 
+				                        {
+				                          JSONObject temp = (JSONObject)objects[o].getJSONArray("extra").get(0);
+				                          writer.write(temp.get("text").toString());
+				                        }
+			                    	}
+			                    } 
+			                    else if (objects[o].has("text"))
+			                    	writer.write(objects[o].getString("text"));
+		                  }
+		                  else if ((!signLines[o].equals("\"\"")) && (!signLines[o].equals("null"))) 
+		                	  writer.write(signLines[o]);
+		                	
+		                  writer.write(" ");
+		                }
+		             writer.newLine();
+				    }
+				}
+			}
+		}
+		writer.close();
 	}
 	
 	public static void readPlayerData() throws IOException
@@ -288,14 +398,10 @@ public class Main {
     				}
 				}
 				else if (pageJSON.has("text"))
-				{
 					writer.write(pageJSON.getString("text"));
-				}
 			}
 			else
-			{
 				writer.write(pages.getStringTagAt(pc));
-			}
 			
 			writer.newLine();
 		}

@@ -26,12 +26,17 @@ public class Main {
 
 	static ArrayList<Integer> bookHashes = new ArrayList<Integer>();
 	static ArrayList<String> signHashes = new ArrayList<String>();
+	static String[] colorCodes = {"§0","§1","§2","§3","§4","§5","§6","§7","§8","§9","§a","§b","§c","§d","§e","§f","§k","§l","§m","§n","§o","§r"};
 	
 	public static void main(String[] args) throws IOException
 	{
-		readBooksAnvil();
 		//readPlayerData();
 		//readSignsAnvil();
+		long startTime = System.currentTimeMillis();
+		readSignsAndBooks();
+		//readSignsAnvil();
+		long elapsed = System.currentTimeMillis() - startTime;
+		System.out.println(elapsed / 1000 + " seconds to complete.");
 		
 		/**
 		 * GUI TO-DO
@@ -45,6 +50,7 @@ public class Main {
 		 * shulker chests
 		 * item frames
 		 * remove colour tags and such
+		 * multithreading
 		 */
 	}
 	
@@ -87,19 +93,132 @@ public class Main {
 		frame.add(test);
 	}
 	
+	public static void readSignsAndBooks() throws IOException
+	{
+		File folder = new File("region");
+		File[] listOfFiles = folder.listFiles();
+		
+		File bookOutput = new File("bookOutput.txt");
+		BufferedWriter bookWriter = new BufferedWriter(new FileWriter(bookOutput));
+		File signOutput = new File("signOutput.txt");
+		BufferedWriter signWriter = new BufferedWriter(new FileWriter(signOutput));
+		
+		for (int f = 0; f < listOfFiles.length; f++)
+		{
+			signWriter.newLine();
+			signWriter.write("--------------------------------" + listOfFiles[f].getName() + "--------------------------------");
+			signWriter.newLine();
+			signWriter.newLine();
+			for (int x = 0; x < 32; x++)
+			{
+				for (int z = 0; z < 32; z++)
+				{
+					DataInputStream dataInputStream  = MCR.RegionFileCache.getChunkInputStream(listOfFiles[f], x, z); 
+					
+					//Stops a null pointer exception when there is no chunk in the .mcr
+					if (dataInputStream == null) 
+						continue;
+					
+					Anvil.NBTTagCompound nbttagcompund = new Anvil.NBTTagCompound();
+										
+				    nbttagcompund = Anvil.CompressedStreamTools.read(dataInputStream);
+				    
+				    Anvil.NBTTagCompound nbttagcompund2 = new Anvil.NBTTagCompound();
+				    nbttagcompund2 = nbttagcompund.getCompoundTag("Level");
+				       
+				    Anvil.NBTTagList tileEntities = nbttagcompund2.getTagList("TileEntities", 10);
+	
+				    for (int i = 0; i < tileEntities.tagCount(); i ++)
+				    {
+				    	Anvil.NBTTagCompound tileEntity = (Anvil.NBTTagCompound) tileEntities.getCompoundTagAt(i);
+				    	{
+				    		//If it is an item
+				    		if (tileEntity.hasKey("id")) 
+				    		{
+				    			Anvil.NBTTagList chestItems = tileEntity.getTagList("Items", 10);
+				    			for (int n = 0; n < chestItems.tagCount(); n++)
+				    			{
+				    				Anvil.NBTTagCompound item = chestItems.getCompoundTagAt(n);
+			    					String bookInfo = ("------------------------------------Chunk [" + x + ", " + z + "] Inside " + tileEntity.getString("id") + " at (" +  tileEntity.getInteger("x") + " " + tileEntity.getInteger("y") + " " + tileEntity.getInteger("z") + ") " + listOfFiles[f].getName() + "------------------------------------" );
+			    					parseItem(item, bookWriter, bookInfo);
+				    			}
+				    		}
+				    		
+				    		//If Sign
+					    	if (tileEntity.hasKey("Text1"))
+					    	{
+					    		String signInfo = "Chunk [" + x + ", " + z + "]\t(" + tileEntity.getInteger("x") + " " + tileEntity.getInteger("y") + " " + tileEntity.getInteger("z") + ")\t\t";
+					    		parseSign(tileEntity, signWriter, signInfo);
+					    	}
+				    	}
+				    }
+				    
+				    Anvil.NBTTagList entities = nbttagcompund2.getTagList("Entities", 10);
+				    
+				    for (int i = 0; i < entities.tagCount(); i ++)
+				    {
+				    	Anvil.NBTTagCompound entity = (Anvil.NBTTagCompound) entities.getCompoundTagAt(i);
+				    	{
+				    		//Donkey, llama etc.
+				    		if (entity.hasKey("Items"))
+				    		{
+				    			Anvil.NBTTagList entityItems = entity.getTagList("Items", 10);
+				    			Anvil.NBTTagList entityPos = entity.getTagList("Pos", 6);
+				    			
+				    			int xPos = (int) Double.parseDouble(entityPos.getStringTagAt(0));
+				    			int yPos = (int) Double.parseDouble(entityPos.getStringTagAt(1));
+				    			int zPos = (int) Double.parseDouble(entityPos.getStringTagAt(2));
+				    			
+				    			for (int n = 0; n < entityItems.tagCount(); n++)
+				    			{
+				    				Anvil.NBTTagCompound item = entityItems.getCompoundTagAt(n);
+			    					String bookInfo = ("------------------------------------Chunk [" + x + ", " + z + "] On entity at (" + xPos + " " + yPos + " " + zPos + ") " + listOfFiles[f].getName() + "------------------------------------" );
+			    					parseItem(item, bookWriter, bookInfo);
+				    			}
+				    		}
+				    		//Item frame or item on the ground
+				    		if (entity.hasKey("Item"))
+				    		{
+				    			Anvil.NBTTagCompound item = entity.getCompoundTag("Item");
+				    			Anvil.NBTTagList entityPos = entity.getTagList("Pos", 6);
+				    			
+				    			int xPos = (int) Double.parseDouble(entityPos.getStringTagAt(0));
+				    			int yPos = (int) Double.parseDouble(entityPos.getStringTagAt(1));
+				    			int zPos = (int) Double.parseDouble(entityPos.getStringTagAt(2));
+				    			
+		    					String bookInfo = ("------------------------------------Chunk [" + x + ", " + z + "] On ground or item frame at at (" + xPos + " " + yPos + " " + zPos + ") " + listOfFiles[f].getName() + "--------------------------------" );
+
+				    			parseItem(item, bookWriter, bookInfo);
+				    		}
+				    	}
+				    }
+				}
+			}	
+		}
+		bookWriter.newLine();
+		bookWriter.write("Completed.");
+		bookWriter.newLine();
+		bookWriter.close();
+		
+		signWriter.newLine();
+		signWriter.write("Completed.");
+		signWriter.newLine();
+		signWriter.close();
+	}
+	
 	public static void readSignsAnvil() throws IOException
 	{
 		File folder = new File("region");
 	    File[] listOfFiles = folder.listFiles();
-	    File output = new File("output.txt");
+	    File output = new File("signOutput.txt");
 	    BufferedWriter writer = new BufferedWriter(new FileWriter(output));
 	    
 		for (int f = 0; f < listOfFiles.length; f++)
 		{
 			writer.newLine();
 			writer.write("--------------------------------" + listOfFiles[f].getName() + "--------------------------------");
-		    writer.newLine();
-		    writer.newLine();
+			writer.newLine();
+			writer.newLine();
 			for (int x = 0; x < 32; x++)
 			{
 				for (int z = 0; z < 32; z++)
@@ -192,6 +311,9 @@ public class Main {
 				}
 			}
 		}
+		writer.newLine();
+		writer.write("Completed.");
+		writer.newLine();
 		writer.close();
 	}
 	
@@ -230,7 +352,7 @@ public class Main {
 		}
 		writer.close();
 	}
-	
+
 	public static void readBooksAnvil() throws IOException
 	{
 		File folder = new File("region");
@@ -246,11 +368,14 @@ public class Main {
 				{
 					DataInputStream dataInputStream  = MCR.RegionFileCache.getChunkInputStream(listOfFiles[f], x, z); 
 					//Stops a null pointer exception when there is no chunk in the .mcr
+					
 					if (dataInputStream == null) 
 						continue;
-					Anvil. NBTTagCompound nbttagcompund = new Anvil.NBTTagCompound();
+					
+					Anvil.NBTTagCompound nbttagcompund = new Anvil.NBTTagCompound();
+										
 				    nbttagcompund = Anvil.CompressedStreamTools.read(dataInputStream);
-				   
+				    
 				    Anvil.NBTTagCompound nbttagcompund2 = new Anvil.NBTTagCompound();
 				    nbttagcompund2 = nbttagcompund.getCompoundTag("Level");
 				       
@@ -316,6 +441,9 @@ public class Main {
 				}
 			}	
 		}
+		writer.newLine();
+		writer.write("Completed.");
+		writer.newLine();
 		writer.close();
 	}
 	
@@ -389,19 +517,19 @@ public class Main {
     				for (int h = 0; h < pageJSON.getJSONArray("extra").length(); h++)
     				{
     					if (pageJSON.getJSONArray("extra").get(h) instanceof String)
-    						writer.write(pageJSON.getJSONArray("extra").get(0).toString());
+    						writer.write(removeTextFormatting(pageJSON.getJSONArray("extra").get(0).toString()));
     					else
     					{
     						JSONObject temp = (JSONObject) pageJSON.getJSONArray("extra").get(h);
-    						writer.write(temp.get("text").toString());
+    						writer.write(removeTextFormatting(temp.get("text").toString()));
     					}				    			
     				}
 				}
 				else if (pageJSON.has("text"))
-					writer.write(pageJSON.getString("text"));
+					writer.write(removeTextFormatting(pageJSON.getString("text")));
 			}
 			else
-				writer.write(pages.getStringTagAt(pc));
+				writer.write(removeTextFormatting(pages.getStringTagAt(pc)));
 			
 			writer.newLine();
 		}
@@ -425,9 +553,83 @@ public class Main {
 		writer.newLine();
 		for (int pc = 0; pc < pages.tagCount(); pc++)
 		{
-			writer.write("Page " + pc + ": " + pages.getStringTagAt(pc));
+			writer.write("Page " + pc + ": " + removeTextFormatting(pages.getStringTagAt(pc)));
 			writer.newLine();
 		}
+	}
+	
+	private static void parseSign(Anvil.NBTTagCompound tileEntity, BufferedWriter signWriter, String signInfo) throws IOException
+	{
+		String text1 = tileEntity.getString("Text1");
+        String text2 = tileEntity.getString("Text2");
+        String text3 = tileEntity.getString("Text3");
+        String text4 = tileEntity.getString("Text4");
+        			                
+        JSONObject json1 = null;
+        JSONObject json2 = null;
+        JSONObject json3 = null;
+        JSONObject json4 = null;
+        
+        String[] signLines = { text1, text2, text3, text4 };
+        
+        String hash = text1 + text2 + text3 + text4;
+        if (signHashes.contains(hash))
+        	return;
+        else
+        	signHashes.add(hash);
+        
+        JSONObject[] objects = { json1, json2, json3, json4 };
+        
+        signWriter.write(signInfo);
+        
+        for (int j = 0; j < 4; j++)
+        {
+        	if (signLines[j].startsWith("{"))
+        	{
+        		try
+        		{
+        			objects[j] = new JSONObject(signLines[j]);
+        		}
+        		catch (JSONException e)
+        		{
+        			objects[j] = null;
+        		}
+        	}
+        }
+       
+        for (int o = 0; o < 4; o++)
+        {
+        	if (objects[o] != null)
+        	{
+                if (objects[o].has("extra"))
+                {
+                	for (int h = 0; h < objects[o].getJSONArray("extra").length(); h++)
+                	{
+                        if ((objects[o].getJSONArray("extra").get(0) instanceof String)) 
+                        	signWriter.write(objects[o].getJSONArray("extra").get(0).toString());
+                        else 
+                        {
+                          JSONObject temp = (JSONObject)objects[o].getJSONArray("extra").get(0);
+                          signWriter.write(temp.get("text").toString());
+                        }
+                	}
+                } 
+                else if (objects[o].has("text"))
+                	signWriter.write(objects[o].getString("text"));
+          }
+          else if ((!signLines[o].equals("\"\"")) && (!signLines[o].equals("null"))) 
+        	  signWriter.write(signLines[o]);
+        	
+        	signWriter.write(" ");
+        }
+        signWriter.newLine();
+	}
+	
+	public static String removeTextFormatting(String text)
+	{
+		for (int i = 0; i < colorCodes.length; i ++)
+			text = text.replace(colorCodes[i], "");
+		return text;
 	}
 	
 }

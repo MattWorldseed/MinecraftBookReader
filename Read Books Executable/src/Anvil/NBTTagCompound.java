@@ -474,7 +474,7 @@ public class NBTTagCompound extends NBTBase
             crashreportcategory.addCrashSection("Tag name", p_152449_1_);
             crashreportcategory.addCrashSection("Tag type", Byte.valueOf(p_152449_0_));
             throw new ReportedException(crashreport);*/
-        	throw null;
+        	return nbtbase;
         }
     }
 }

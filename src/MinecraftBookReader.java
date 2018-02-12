@@ -22,7 +22,7 @@ import Anvil.NBTTagCompound;
 import java.awt.*;
 
 
-public class Main {
+public class MinecraftBookReader {
 
 	static ArrayList<Integer> bookHashes = new ArrayList<Integer>();
 	static ArrayList<String> signHashes = new ArrayList<String>();
